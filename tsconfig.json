@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,    
+    "noUnusedLocals" : false,
+    "outDir": "./dist/",
+    "sourceMap": true,
+    "module": "commonjs",
+    "target": "es2015",
+    "types":[],
+    "removeComments" : true
+  },
+  "include": [
+    "src/**/*"
+  ]
+}
