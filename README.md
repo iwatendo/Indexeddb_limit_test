@@ -1,0 +1,2 @@
+# Indexeddb_limit_test
+IndexedDBの登録できる容量の限界値を検証
