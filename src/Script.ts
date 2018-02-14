@@ -22,7 +22,12 @@ function GetLogElement(): HTMLTextAreaElement {
     return document.getElementById('output-log') as HTMLTextAreaElement;
 }
 
-function CreateKey(cnt : number) : string{
+function WriteLog(element: HTMLTextAreaElement, text: string) {
+    element.textContent += text;
+    element.scrollTop = element.scrollHeight;
+}
+
+function CreateKey(cnt: number): string {
     return ("00000" + cnt.toString()).slice(-5);
 }
 
@@ -50,16 +55,16 @@ function DoWriteTest(binarySize: number, recCount: number) {
 
             _db.Write<Test.Dummy>(Test.DB.DUMMY, key, dat, () => {
 
-                logElement.textContent += "Key " + key + " : Write ";
+                WriteLog(logElement, "Key " + key + " : Write ");
 
                 ExistCheck(key, binarySize, (isExist: boolean) => {
 
                     if (isExist) {
                         totalSize += binarySize;
-                        logElement.textContent += "/ Read succeed : Total " + (totalSize / (1024 * 1024)).toString() + " MB\n";
+                        WriteLog(logElement, "/ Read succeed : Total " + (totalSize / (1024 * 1024)).toString() + " MB\n");
                     }
                     else {
-                        logElement.textContent += "/ No Data";
+                        WriteLog(logElement, "/ No Data\n");
                     }
 
                     func(cnt);
@@ -93,12 +98,12 @@ function DoReadTest(binarySize: number, recCount: number) {
             let key = CreateKey(cnt);
 
             ExistCheck(key, binarySize, (isExist: boolean) => {
-                logElement.textContent += "Key " + key + " : ";
+                WriteLog(logElement, "Key " + key + " : ");
                 if (isExist) {
-                    logElement.textContent += "Read succeed\n";
+                    WriteLog(logElement, "Read succeed\n");
                 }
                 else {
-                    logElement.textContent += "No Data\n";
+                    WriteLog(logElement, "No Data\n");
                 }
                 readCheck(cnt);
             });
@@ -130,15 +135,15 @@ function DoDeleteTest(binarySize: number, recCount: number) {
             let key = CreateKey(cnt);
 
             ExistCheck(key, binarySize, (isExist: boolean) => {
-                logElement.textContent += "Key " + key + " : ";
+                WriteLog(logElement, "Key " + key + " : ");
                 if (isExist) {
                     _db.Delete<Test.Dummy>(Test.DB.DUMMY, key, () => {
-                        logElement.textContent += "Delete\n";
+                        WriteLog(logElement, "Delete\n");
                         func(cnt);
                     });
                 }
                 else {
-                    logElement.textContent += "No Data\n";
+                    WriteLog(logElement, "No Data\n");
                     func(cnt);
                 }
             });

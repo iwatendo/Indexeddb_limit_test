@@ -17,27 +17,29 @@ export default abstract class AbstractIndexedDB<D> {
     protected _storelist: Array<string>;
 
 
+    /**
+     * コンストラクタ
+     * @param dbName データベース名
+     */
     constructor(dbName: string) {
         this._dbname = dbName;
         this._storelist = new Array<string>();
     }
 
 
+    /**
+     * 
+     * @param storeName
+     */
     protected SetStoreList(storeName: string) {
         this._storelist.push(storeName);
     }
 
 
-    private RequestError(e: Event, req: IDBRequest) {
-        if (req && req.error) {
-            alert(req.error.toString());
-        }
-        else {
-            alert("Unknown request error in IndexedDB.");
-        }
-    }
-
-
+    /**
+     * IndexedDBの構築
+     * @param onCreate 
+     */
     protected Create(onCreate: OnCreateDB) {
         let rep: IDBOpenDBRequest = window.indexedDB.open(this._dbname, 2);
         rep.onupgradeneeded = (e) => { this.CreateStore(e) };
@@ -46,12 +48,20 @@ export default abstract class AbstractIndexedDB<D> {
     }
 
 
+    /**
+     * ストア生成
+     * @param event 
+     */
     private CreateStore(event: IDBVersionChangeEvent) {
         this._db = (<IDBRequest>event.target).result;
         this._storelist.forEach((s) => this._db.createObjectStore(s));
     }
 
 
+    /**
+     * IndexedDBを削除
+     * @param onRemove 
+     */
     public Remove(onRemove: OnRemoveDB) {
 
         if (this._db)
@@ -69,6 +79,10 @@ export default abstract class AbstractIndexedDB<D> {
     }
 
 
+    /**
+     * IndexedDBに接続
+     * @param onconnect 
+     */
     public Connect(onconnect: OnConnect) {
 
         let rep: IDBOpenDBRequest = window.indexedDB.open(this._dbname, 2);
@@ -84,9 +98,59 @@ export default abstract class AbstractIndexedDB<D> {
     }
 
 
+    /**
+     * リクエストエラー発生時の処理
+     * @param e 
+     * @param req 
+     */
+    private RequestError(e: Event, req: IDBRequest) {
+        if (req && req.error) {
+            alert(req.error.toString());
+        }
+        else {
+            alert("Unknown request error in IndexedDB.");
+        }
+    }
+
+
+    /**
+     * トランザクションの生成
+     * @param storeName 
+     * @param mode 
+     */
+    private CreateTransaction(storeName: string, mode: IDBTransactionMode): IDBTransaction {
+        let trans = this._db.transaction(storeName, mode);
+
+        trans.onabort = () => {
+            let msg = "IndexedDB Transaction Abort\n";
+            if (trans.error) {
+                msg += trans.error.toString();
+            }
+            alert(msg);
+        }
+
+        trans.onerror = (e) => {
+            let msg = "IndexedDB Transaction Error\n";
+            if (trans.error) {
+                msg += trans.error.toString();
+            }
+            alert(msg);
+        }
+
+        return trans;
+    }
+
+
+    /**
+     * データ登録
+     * @param storeName ストア名
+     * @param key 登録キー
+     * @param data 登録データ
+     * @param callback 登録成功時のコールバック
+     */
     public Write<T>(storeName: string, key: IDBKeyRange | IDBValidKey, data: T, callback: OnWriteDB<T> = null) {
 
-        let trans = this._db.transaction(storeName, 'readwrite');
+        let trans = this.CreateTransaction(storeName, 'readwrite');
         let store = trans.objectStore(storeName);
 
         if (key) {
@@ -107,18 +171,32 @@ export default abstract class AbstractIndexedDB<D> {
     }
 
 
+    /**
+     * データ削除
+     * @param storeName ストア名称
+     * @param key 削除対象のデータキー
+     * @param callback 削除成功時のコールバック
+     */
     public Delete<T>(storeName: string, key: IDBKeyRange | IDBValidKey, callback: OnDeleteObject<T> = null) {
-        let trans = this._db.transaction(storeName, 'readwrite');
+        let trans = this.CreateTransaction(storeName, 'readwrite');
         let store = trans.objectStore(storeName);
-        let request = store.delete(key);
-        request.onerror = (e) => { this.RequestError(e, request); }
+        let req = store.delete(key);
+
+        req.onerror = (e) => { this.RequestError(e, req); }
 
         if (callback != null) {
-            request.onsuccess = (e) => { callback(); }
+            req.onsuccess = (e) => { callback(); }
         }
     }
 
 
+    /**
+     * データ一括登録
+     * @param storeName ストア名称
+     * @param getkey 登録キー生成関数
+     * @param datalist データリスト
+     * @param callback データ登録成功時のコールバック
+     */
     public WriteAll<T>(storeName: string, getkey: ObtainWritekey<T>, datalist: Array<T>, callback: OnWriteDB<T> = null) {
 
         let writefunc = (data) => {
@@ -138,9 +216,15 @@ export default abstract class AbstractIndexedDB<D> {
     }
 
 
+    /**
+     * データ読込処理
+     * @param storeName ストア名
+     * @param key 読込データキー 
+     * @param callback 読込成功時のコールバック
+     */
     public Read<T, K>(storeName: string, key: K, callback: OnReadObject<T>) {
 
-        let trans = this._db.transaction(storeName, 'readonly');
+        let trans = this.CreateTransaction(storeName, 'readonly');
         let store = trans.objectStore(storeName);
         let req = store.get(key);
 
@@ -149,12 +233,17 @@ export default abstract class AbstractIndexedDB<D> {
     }
 
 
+    /**
+     * ストア内データの一括読込
+     * @param storeName ストア名
+     * @param callback 読込成功時のコールバック
+     */
     public ReadAll<T>(storeName: string, callback: OnReadObject<Array<T>>) {
 
         this._db.onerror = (e) => {
             alert(e.target)
         }
-        let trans = this._db.transaction(storeName, 'readonly');
+        let trans = this.CreateTransaction(storeName, 'readonly');
         let store = trans.objectStore(storeName);
         let req = store.openCursor();
 
@@ -179,9 +268,14 @@ export default abstract class AbstractIndexedDB<D> {
     }
 
 
+    /**
+     * ストア内データの一括削除
+     * @param storeName ストア名
+     * @param callback 削除成功時のコールバック
+     */
     public ClearAll<T>(storeName: string, callback: OnClearObject<T>) {
 
-        let trans = this._db.transaction(storeName, 'readwrite');
+        let trans = this.CreateTransaction(storeName, 'readwrite');
         let store = trans.objectStore(storeName);
         let req = store.openCursor();
         store.clear();
