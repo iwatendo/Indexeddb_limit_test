@@ -3,9 +3,11 @@ import * as DBI from "./AbstractIndexedDB";
 
 
 export class Dummy {
+    id: string;
     buffer: ArrayBuffer;
-    constructor(size:number) {
-        this.buffer = new ArrayBuffer(1024 * 1024 * size);
+    constructor(id: string, size: number) {
+        this.id = id;
+        this.buffer = new ArrayBuffer(size);
     }
 }
 

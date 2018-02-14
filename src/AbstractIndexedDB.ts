@@ -6,7 +6,6 @@ interface OnWriteDB<T> { (): void };
 interface OnDeleteObject<T> { (): void };
 interface OnClearObject<T> { (): void };
 interface OnConnect { (): void };
-interface OnError { (ev: Event): void };
 export interface OnLoadComplete<T> { (data: T): void }
 export interface OnWriteComplete { (): void }
 
@@ -17,27 +16,33 @@ export default abstract class AbstractIndexedDB<D> {
     protected _db: IDBDatabase;
     protected _storelist: Array<string>;
 
-    constructor(name: string) {
-        this._dbname = name;
+
+    constructor(dbName: string) {
+        this._dbname = dbName;
         this._storelist = new Array<string>();
     }
 
 
-    protected SetStoreList(name: string) {
-        this._storelist.push(name);
+    protected SetStoreList(storeName: string) {
+        this._storelist.push(storeName);
     }
 
 
-    private OnError(e: Event) {
-        alert((<IDBRequest>event.target).error.toString());
+    private RequestError(e: Event, req: IDBRequest) {
+        if (req && req.error) {
+            alert(req.error.toString());
+        }
+        else {
+            alert("Unknown request error in IndexedDB.");
+        }
     }
 
 
     protected Create(onCreate: OnCreateDB) {
         let rep: IDBOpenDBRequest = window.indexedDB.open(this._dbname, 2);
-        rep.onupgradeneeded = (e) => this.CreateStore(e);
-        rep.onsuccess = (es) => { onCreate(); };
-        rep.onerror = this.OnError;
+        rep.onupgradeneeded = (e) => { this.CreateStore(e) };
+        rep.onsuccess = (e) => { onCreate(); };
+        rep.onerror = (e) => { this.RequestError(e, rep); };
     }
 
 
@@ -53,13 +58,11 @@ export default abstract class AbstractIndexedDB<D> {
             this._db.close();
 
         let req = window.indexedDB.deleteDatabase(this._dbname);
-        req.onsuccess = (es) => {
-            onRemove();
-        };
-        req.onerror = this.OnError;
+        req.onsuccess = (e) => { onRemove(); };
+        req.onerror = (e) => { this.RequestError(e, req); }
 
-        req.onblocked = (es: IDBVersionChangeEvent) => {
-            //  LogUtil.Warning(null, "Delete blocked : " + this._dbname);
+        req.onblocked = (e: IDBVersionChangeEvent) => {
+            //
         };
 
         req.onupgradeneeded
@@ -67,52 +70,56 @@ export default abstract class AbstractIndexedDB<D> {
 
 
     public Connect(onconnect: OnConnect) {
+
         let rep: IDBOpenDBRequest = window.indexedDB.open(this._dbname, 2);
 
-        rep.onupgradeneeded = (e) => {
-            this.CreateStore(e);
-        }
+        rep.onupgradeneeded = (e) => { this.CreateStore(e); }
 
-        rep.onerror = this.OnError;
+        rep.onerror = (e) => { alert(rep.error.toString()); };
 
-        rep.onsuccess = (event) => {
-            this._db = (<IDBRequest>event.target).result;
+        rep.onsuccess = (e) => {
+            this._db = rep.result;
             onconnect();
         };
     }
 
 
-    public Write<T>(name: string, key: IDBKeyRange | IDBValidKey, data: T, callback: OnWriteDB<T> = null) {
+    public Write<T>(storeName: string, key: IDBKeyRange | IDBValidKey, data: T, callback: OnWriteDB<T> = null) {
 
-        let trans = this._db.transaction(name, 'readwrite');
-        let store = trans.objectStore(name);
+        let trans = this._db.transaction(storeName, 'readwrite');
+        let store = trans.objectStore(storeName);
 
         if (key) {
-            let request = store.put(data, key);
-            request.onerror = this.OnError;
+            let req = store.put(data, key);
+
+            req.onerror = (e) => { this.RequestError(e, req); };
+
             if (callback != null) {
-                request.onsuccess = (event) => { callback(); }
+                req.onsuccess = (e) => {
+                    callback();
+                }
             }
+
         }
         else {
-            alert("Write key error : Store " + name);
+            alert("Store key is empty.");
         }
     }
 
 
-    public Delete<T>(name: string, key: IDBKeyRange | IDBValidKey, callback: OnDeleteObject<T> = null) {
-        let trans = this._db.transaction(name, 'readwrite');
-        let store = trans.objectStore(name);
+    public Delete<T>(storeName: string, key: IDBKeyRange | IDBValidKey, callback: OnDeleteObject<T> = null) {
+        let trans = this._db.transaction(storeName, 'readwrite');
+        let store = trans.objectStore(storeName);
         let request = store.delete(key);
-        request.onerror = this.OnError;
+        request.onerror = (e) => { this.RequestError(e, request); }
 
         if (callback != null) {
-            request.onsuccess = (event) => { callback(); }
+            request.onsuccess = (e) => { callback(); }
         }
     }
 
 
-    public WriteAll<T>(name: string, getkey: ObtainWritekey<T>, datalist: Array<T>, callback: OnWriteDB<T> = null) {
+    public WriteAll<T>(storeName: string, getkey: ObtainWritekey<T>, datalist: Array<T>, callback: OnWriteDB<T> = null) {
 
         let writefunc = (data) => {
 
@@ -121,7 +128,7 @@ export default abstract class AbstractIndexedDB<D> {
                     callback();
             }
             else {
-                this.Write(name, getkey(data), data, () => {
+                this.Write(storeName, getkey(data), data, () => {
                     writefunc(datalist.pop());
                 });
             }
@@ -131,36 +138,31 @@ export default abstract class AbstractIndexedDB<D> {
     }
 
 
-    public Read<T, K>(name: string, key: K, callback: OnReadObject<T>, onerror: OnError = null) {
+    public Read<T, K>(storeName: string, key: K, callback: OnReadObject<T>) {
 
-        let trans = this._db.transaction(name, 'readonly');
-        let store = trans.objectStore(name);
-        let request = store.get(key);
+        let trans = this._db.transaction(storeName, 'readonly');
+        let store = trans.objectStore(storeName);
+        let req = store.get(key);
 
-        if (onerror)
-            request.onerror = this.OnError;
-        else
-            request.onerror = onerror;
-
-        request.onsuccess = (event) => {
-            let result: T = (<IDBRequest>event.target).result as T;
-            callback(result);
-        };
-
+        req.onerror = (e) => { this.RequestError(e, req); }
+        req.onsuccess = (e) => { callback(req.result); };
     }
 
-    public ReadAll<T>(name: string, callback: OnReadObject<Array<T>>) {
 
-        this._db.onerror = this.OnError;
-        let trans = this._db.transaction(name, 'readonly');
-        let store = trans.objectStore(name);
-        let request = store.openCursor();
+    public ReadAll<T>(storeName: string, callback: OnReadObject<Array<T>>) {
+
+        this._db.onerror = (e) => {
+            alert(e.target)
+        }
+        let trans = this._db.transaction(storeName, 'readonly');
+        let store = trans.objectStore(storeName);
+        let req = store.openCursor();
 
         let result: Array<T> = new Array<T>();
 
-        request.onerror = this.OnError;
-        request.onsuccess = (event) => {
-            let cursor = <IDBCursorWithValue>(<IDBRequest>event.target).result;
+        req.onerror = (e) => { this.RequestError(e, req); }
+        req.onsuccess = (e) => {
+            let cursor = <IDBCursorWithValue>(req).result;
 
             if (cursor) {
                 let msg = cursor.value as T;
@@ -176,23 +178,20 @@ export default abstract class AbstractIndexedDB<D> {
 
     }
 
-    public ClearAll<T>(name: string, callback: OnClearObject<T>) {
 
-        let trans = this._db.transaction(name, 'readwrite');
-        let store = trans.objectStore(name);
-        let request = store.openCursor();
+    public ClearAll<T>(storeName: string, callback: OnClearObject<T>) {
 
+        let trans = this._db.transaction(storeName, 'readwrite');
+        let store = trans.objectStore(storeName);
+        let req = store.openCursor();
         store.clear();
-
-        request.onerror = this.OnError;
-        request.onsuccess = (event) => {
-            callback();
-        };
+        req.onerror = (e) => { this.RequestError(e, req); };
+        req.onsuccess = (e) => { callback(); };
 
     }
 
     public abstract GetName(): string;
 
     public abstract GetNote(): string;
-    
+
 }

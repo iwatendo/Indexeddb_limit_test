@@ -3,37 +3,162 @@
 let _db = new Test.DB();
 
 _db.Connect(() => {
-    document.getElementById("appendData").onclick = () => {
-        AppendData();
-    };
+    document.getElementById("writeTest").onclick = () => { DoWriteTest(GetBinarySize(), GetRecordCount()); };
+    document.getElementById("readTest").onclick = () => { DoReadTest(GetBinarySize(), GetRecordCount()); };
+    document.getElementById("deleteTest").onclick = () => { DoDeleteTest(GetBinarySize(), GetRecordCount()); };
 });
 
 
-function AppendData() {
-
+function GetBinarySize(): number {
     let recSize = Number.parseInt((document.getElementById('binary-size') as HTMLInputElement).value);
-    let recCount = Number.parseInt((document.getElementById('record-count') as HTMLInputElement).value);
+    return recSize * 1024 * 1024;
+}
 
-    let output = document.getElementById('output-log');
+function GetRecordCount(): number {
+    return Number.parseInt((document.getElementById('record-count') as HTMLInputElement).value);
+}
 
-    let counter = 0;
+function GetLogElement(): HTMLTextAreaElement {
+    return document.getElementById('output-log') as HTMLTextAreaElement;
+}
+
+function CreateKey(cnt : number) : string{
+    return ("00000" + cnt.toString()).slice(-5);
+}
+
+/**
+ * 書込テスト
+ * @param binarySize 
+ * @param recCount 
+ */
+function DoWriteTest(binarySize: number, recCount: number) {
+
+    let logElement = GetLogElement();
+    logElement.textContent = "";
+
     let totalSize = 0;
 
-    let func = (count: number) => {
-        if (count > 0) {
-            let dat = new Test.Dummy(recSize);
-            counter++;
-            let key = ("00000000" + counter.toString()).slice(-8);
+    //  書込チェック
+    let func = (cnt: number) => {
+
+        if (cnt < recCount) {
+
+            cnt++;
+            let key = CreateKey(cnt);
+
+            let dat = new Test.Dummy(key, binarySize);
 
             _db.Write<Test.Dummy>(Test.DB.DUMMY, key, dat, () => {
-                totalSize += recSize;
-                let log = key + " : Total Size = " + totalSize.toString() + "MB";
-                output.textContent = output.textContent + log.toString() + "\n";
-                console.info(log);
-                func(count - 1);
+
+                logElement.textContent += "Key " + key + " : Write ";
+
+                ExistCheck(key, binarySize, (isExist: boolean) => {
+
+                    if (isExist) {
+                        totalSize += binarySize;
+                        logElement.textContent += "/ Read succeed : Total " + (totalSize / (1024 * 1024)).toString() + " MB\n";
+                    }
+                    else {
+                        logElement.textContent += "/ No Data";
+                    }
+
+                    func(cnt);
+                });
             });
         }
     };
 
-    func(recCount);
+    func(0);
+}
+
+
+/**
+ * 読込テスト
+ * @param binarySize 
+ * @param recCount 
+ */
+function DoReadTest(binarySize: number, recCount: number) {
+
+    let logElement = GetLogElement();
+    logElement.textContent = "";
+
+    let totalSize = 0;
+
+    //  読込チェック
+    let readCheck = (cnt: number) => {
+
+        if (cnt < recCount) {
+
+            cnt++;
+            let key = CreateKey(cnt);
+
+            ExistCheck(key, binarySize, (isExist: boolean) => {
+                logElement.textContent += "Key " + key + " : ";
+                if (isExist) {
+                    logElement.textContent += "Read succeed\n";
+                }
+                else {
+                    logElement.textContent += "No Data\n";
+                }
+                readCheck(cnt);
+            });
+        }
+    }
+
+    readCheck(0);
+}
+
+
+/**
+ * 削除テスト
+ * @param binarySize 
+ * @param recCount 
+ */
+function DoDeleteTest(binarySize: number, recCount: number) {
+
+    let logElement = GetLogElement();
+    logElement.textContent = "";
+
+    let totalSize = 0;
+
+    //  削除処理
+    let func = (cnt: number) => {
+
+        if (cnt < recCount) {
+
+            cnt++;
+            let key = CreateKey(cnt);
+
+            ExistCheck(key, binarySize, (isExist: boolean) => {
+                logElement.textContent += "Key " + key + " : ";
+                if (isExist) {
+                    _db.Delete<Test.Dummy>(Test.DB.DUMMY, key, () => {
+                        logElement.textContent += "Delete\n";
+                        func(cnt);
+                    });
+                }
+                else {
+                    logElement.textContent += "No Data\n";
+                    func(cnt);
+                }
+            });
+
+        }
+    }
+
+    func(0);
+}
+
+
+function ExistCheck(key: string, recsize: number, callback) {
+
+    _db.Read<Test.Dummy, string>(Test.DB.DUMMY, key, (readRec: Test.Dummy) => {
+        if (readRec && readRec.id === key && readRec.buffer.byteLength === recsize) {
+            callback(true);
+        }
+        else {
+            callback(false);
+        }
+    });
+
 }

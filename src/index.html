@@ -9,10 +9,16 @@
 
 <body>
     <div>
-        １レコードあたりのデータサイズ(MB)：<input id="binary-size" type="text" value="32"><br>
-        追加するレコード件数：<input id="record-count" type="text" value="10"><br>
-        <input id="appendData" type="button" value="データ追加テスト"/><br>
-        <textarea id="output-log" rows="20" cols="80" spellcheck="false"></textarea>
+        １レコードあたりのデータサイズ(MB)：
+        <input id="binary-size" type="text" value="32">
+        <br> 追加するレコード件数：
+        <input id="record-count" type="text" value="10">
+        <br>
+        <input id="writeTest" type="button" value="書込テスト" />
+        <input id="readTest" type="button" value="読込テスト" />
+        <input id="deleteTest" type="button" value="削除テスト" />
+        <br>
+        <textarea id="output-log" rows="40" cols="60" spellcheck="false"></textarea>
     </div>
 </body>
 
