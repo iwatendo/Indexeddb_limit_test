@@ -1,8 +1,9 @@
 # Indexeddb_limit_test
-IndexedDBに大容量データを登録してみるサービスです。<br/>
+Google ChromeのIndexedDBに大容量データを登録してみるサービスです。<br/>
 https://skybeje.net/indexeddb_limit_test/<br/>
 
 ![スクリーンショット](https://github.com/iwatendo/Indexeddb_limit_test/blob/master/doc/screen-shot.png "ScreenShot")
+※Google Chrome以外での動作は未検証です。
 
 ## ビルド方法
 ```
